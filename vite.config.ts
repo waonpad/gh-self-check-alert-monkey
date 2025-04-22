@@ -9,7 +9,14 @@ export default defineConfig({
       userscript: {
         icon: "https://vitejs.dev/logo.svg",
         namespace: "npm/vite-plugin-monkey",
-        match: ["https://github.com/*"],
+        match: [
+          // GitHub
+          "https://github.com/*",
+          // GitLab
+          "https://gitlab.com/*",
+          // リポジトリがセルフホストされている場合、ここにリポジトリURLを記載
+          // "<リポジトリURL>/*"
+        ],
       },
     }),
   ],

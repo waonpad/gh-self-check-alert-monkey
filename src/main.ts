@@ -1,9 +1,12 @@
 /**
  * 拡張機能を有効にするページのルートパターン
- *
- * - PR作成ページ
  */
-const matchRoutePatterns = ["/:user_id/:repository/compare/:range"] as const satisfies string[];
+const matchRoutePatterns = [
+  // GitHubのPR作成ページ
+  "/:user_id/:repository/compare/:range",
+  // GitLabのMR作成ページ
+  "projects:merge_requests:creations:new",
+] as const satisfies string[];
 
 /**
  * 現在のURL
@@ -101,6 +104,10 @@ const manageEventListeners = ({ url, routePattern }: { url: string; routePattern
   }
 };
 
+const getIsRunOnGitHub = () => {
+  return window.location.href.startsWith("https://github.com");
+};
+
 const getGitHubRoutePattern = () => {
   const routePatternMetaElement = document.querySelector<HTMLMetaElement>("meta[name='route-pattern']");
 
@@ -111,28 +118,60 @@ const getGitHubRoutePattern = () => {
   return routePatternMetaElement.content;
 };
 
-/**
- * イベントリスナーを管理する関数を実行するかどうかはMutationObserverで監視した結果で判断する
- */
-const observerCallback = ((mutations: MutationRecord[]) => {
-  const addedNodes = mutations.flatMap((mutation) => Array.from(mutation.addedNodes));
+const getGitLabRoutePattern = () => {
+  const routePatternMetaElement = document.querySelector<HTMLBodyElement>("body[data-page]");
 
-  /**
-   * head > meta[name='request-id']の要素の変化を監視してURLが変わったかどうかを判断する
-   */
-  const changeTarget = addedNodes.find((node) => {
+  if (!routePatternMetaElement) {
+    throw new Error("指定されたクエリで要素が見つかりませんでした(body[data-page])");
+  }
+
+  // biome-ignore lint/style/noNonNullAssertion: <explanation>
+  return routePatternMetaElement.getAttribute("data-page")!;
+};
+
+/**
+ * 配列の中に対象が存在する時、GitHubのURLが変わったと判断できる要素を取得する
+ */
+const findGitHubUrlChangeTargetElement = (nodes: Node[]) => {
+  return nodes.find((node) => {
     if (node instanceof HTMLMetaElement) {
       return node.name === "request-id";
     }
 
     return false;
   }) as HTMLMetaElement | undefined;
+};
+
+/**
+ * 配列の中に対象が存在する時、GitLabのURLが変わったと判断できる要素を取得する
+ */
+const findGitLabUrlChangeTargetElement = (nodes: Node[]) => {
+  return nodes.find((node) => {
+    if (node instanceof HTMLMetaElement) {
+      return node.name === "csp-nonce";
+    }
+
+    return false;
+  }) as HTMLMetaElement | undefined;
+};
+
+/**
+ * イベントリスナーを管理する関数を実行するかどうかはMutationObserverで監視した結果で判断する
+ */
+const observerCallback = ((mutations: MutationRecord[]) => {
+  const addedNodes = mutations.flatMap((mutation) => Array.from(mutation.addedNodes));
+
+  const isRunOnGitHub = getIsRunOnGitHub();
+
+  const changeTarget = isRunOnGitHub
+    ? findGitHubUrlChangeTargetElement(addedNodes)
+    : findGitLabUrlChangeTargetElement(addedNodes);
 
   if (!changeTarget) return;
 
   manageEventListeners({
     url: window.location.href,
-    routePattern: getGitHubRoutePattern(),
+    routePattern: isRunOnGitHub ? getGitHubRoutePattern() : getGitLabRoutePattern(),
   });
 }) satisfies MutationCallback;
 
@@ -149,10 +188,12 @@ const init = () => {
   const observer = new MutationObserver(observerCallback);
   observer.observe(observeTargetNode, { childList: true, subtree: true });
 
+  const isRunOnGitHub = getIsRunOnGitHub();
+
   // 初回実行は手動で行う
   manageEventListeners({
     url: window.location.href,
-    routePattern: getGitHubRoutePattern(),
+    routePattern: isRunOnGitHub ? getGitHubRoutePattern() : getGitLabRoutePattern(),
   });
 };
 
