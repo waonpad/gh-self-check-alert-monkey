@@ -1,3 +1,12 @@
+import {
+  findGitHubUrlChangeTargetElement,
+  findGitLabUrlChangeTargetElement,
+  getGitHubRoutePattern,
+  getGitLabRoutePattern,
+  getIsFromBFCache,
+  getIsRunOnGitHub,
+} from "./utils";
+
 /**
  * 拡張機能を有効にするページのルートパターン
  */
@@ -16,6 +25,10 @@ let currentUrl: string | undefined = undefined;
  * イベントリスナーが登録されているかどうか
  */
 let isEventListening = false;
+/**
+ * メイン処理をスキップするかどうか
+ */
+let isSkipAction = false;
 
 /**
  * 最初に押すキー
@@ -71,6 +84,8 @@ const keyUpListener = (event: KeyboardEvent) => {
 
 /**
  * イベントリスナーを登録したり削除したりする
+ *
+ * @todo イベントリスナーの管理以外もやってしまっているので良い感じにする
  */
 const manageEventListeners = ({ url, routePattern }: { url: string; routePattern: string }) => {
   // URLが変わっていない場合は何もしない
@@ -94,7 +109,14 @@ const manageEventListeners = ({ url, routePattern }: { url: string; routePattern
   }
 
   // 新しいURLが条件マッチする場合
-  action();
+
+  if (isSkipAction) {
+    // 処理をスキップするフラグが立っている場合は、フラグを下げる
+    isSkipAction = false;
+  } else {
+    // 処理をスキップするフラグが立っていない場合は、メインの処理を実行する
+    action();
+  }
 
   // イベントリスナーが登録されていない場合は登録する
   if (!isEventListening) {
@@ -104,61 +126,23 @@ const manageEventListeners = ({ url, routePattern }: { url: string; routePattern
   }
 };
 
-const getIsRunOnGitHub = () => {
-  return window.location.href.startsWith("https://github.com");
-};
+/**
+ * URLが変わったかどうかを監視するための要素の親要素を取得する
+ */
+const getObserveTargetElement = () => {
+  const observeTargetElement = document.querySelector<HTMLHeadElement>("head");
 
-const getGitHubRoutePattern = () => {
-  const routePatternMetaElement = document.querySelector<HTMLMetaElement>("meta[name='route-pattern']");
-
-  if (!routePatternMetaElement) {
-    throw new Error("指定されたクエリで要素が見つかりませんでした(meta[name='route-pattern'])");
+  if (!observeTargetElement) {
+    throw new Error("指定されたクエリで要素が見つかりませんでした(head)");
   }
 
-  return routePatternMetaElement.content;
-};
-
-const getGitLabRoutePattern = () => {
-  const routePatternMetaElement = document.querySelector<HTMLBodyElement>("body[data-page]");
-
-  if (!routePatternMetaElement) {
-    throw new Error("指定されたクエリで要素が見つかりませんでした(body[data-page])");
-  }
-
-  // biome-ignore lint/style/noNonNullAssertion: <explanation>
-  return routePatternMetaElement.getAttribute("data-page")!;
-};
-
-/**
- * 配列の中に対象が存在する時、GitHubのURLが変わったと判断できる要素を取得する
- */
-const findGitHubUrlChangeTargetElement = (nodes: Node[]) => {
-  return nodes.find((node) => {
-    if (node instanceof HTMLMetaElement) {
-      return node.name === "request-id";
-    }
-
-    return false;
-  }) as HTMLMetaElement | undefined;
-};
-
-/**
- * 配列の中に対象が存在する時、GitLabのURLが変わったと判断できる要素を取得する
- */
-const findGitLabUrlChangeTargetElement = (nodes: Node[]) => {
-  return nodes.find((node) => {
-    if (node instanceof HTMLMetaElement) {
-      return node.name === "csp-nonce";
-    }
-
-    return false;
-  }) as HTMLMetaElement | undefined;
+  return observeTargetElement;
 };
 
 /**
  * イベントリスナーを管理する関数を実行するかどうかはMutationObserverで監視した結果で判断する
  */
-const observerCallback = ((mutations: MutationRecord[]) => {
+const mutationCallback = ((mutations: MutationRecord[]) => {
   const addedNodes = mutations.flatMap((mutation) => Array.from(mutation.addedNodes));
 
   const isRunOnGitHub = getIsRunOnGitHub();
@@ -176,17 +160,29 @@ const observerCallback = ((mutations: MutationRecord[]) => {
 }) satisfies MutationCallback;
 
 /**
- * 監視の開始とイベントリスナーの管理初期化
+ * ページ表示時にメイン処理をスキップするかどうかを管理する処理を初期化する
  */
-const init = () => {
-  const observeTargetNode = document.querySelector<HTMLHeadElement>("head");
+const initSkipActionManager = () => {
+  const isFromBFCache = getIsFromBFCache();
 
-  if (!observeTargetNode) {
-    throw new Error("指定されたクエリで要素が見つかりませんでした(head)");
+  if (isFromBFCache) {
+    // 戻る/進む操作で現在のページに来た場合は、初回のページ表示時のメイン処理をスキップする
+    isSkipAction = true;
   }
 
-  const observer = new MutationObserver(observerCallback);
-  observer.observe(observeTargetNode, { childList: true, subtree: true });
+  window.addEventListener("popstate", () => {
+    // 戻る/進む操作で遷移した場合は、その回のページ表示時のメイン処理をスキップする
+    isSkipAction = true;
+  });
+};
+
+const init = () => {
+  initSkipActionManager();
+
+  const observeTarget = getObserveTargetElement();
+
+  const observer = new MutationObserver(mutationCallback);
+  observer.observe(observeTarget, { childList: true, subtree: true });
 
   const isRunOnGitHub = getIsRunOnGitHub();
 
