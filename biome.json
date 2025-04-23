@@ -11,25 +11,22 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "all": true,
       "correctness": {
-        "noUndeclaredVariables": "error",
-        "noUnusedVariables": "error",
-        "noUnusedImports": "error"
+        "useImportExtensions": "off",
+        "noUndeclaredDependencies": "off"
       },
       "style": {
-        "noImplicitBoolean": "error"
+        "useNamingConvention": "off"
       },
-      "nursery": {
-        "useSortedClasses": {
-          "fix": "safe",
-          "level": "error",
-          "options": {}
-        }
+      "suspicious": {
+        "noConsole": "off",
+        "noConsoleLog": "off",
+        "noReactSpecificProps": "off"
       }
     }
   },
   "files": {
-    "ignore": ["**/node_modules/**", "**/*.json"]
+    "ignore": ["**/node_modules/**", "**/*.json", "dist/**"]
   }
 }

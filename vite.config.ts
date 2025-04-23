@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import monkey from "vite-plugin-monkey";
 
 // https://vitejs.dev/config/
+// biome-ignore lint/style/noDefaultExport: <explanation>
 export default defineConfig({
   plugins: [
     monkey({

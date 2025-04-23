@@ -20,7 +20,7 @@ const matchRoutePatterns = [
 /**
  * 現在のURL
  */
-let currentUrl: string | undefined = undefined;
+let currentUrl: string | undefined;
 /**
  * イベントリスナーが登録されているかどうか
  */
@@ -89,7 +89,9 @@ const keyUpListener = (event: KeyboardEvent) => {
  */
 const manageEventListeners = ({ url, routePattern }: { url: string; routePattern: string }) => {
   // URLが変わっていない場合は何もしない
-  if (currentUrl === url) return;
+  if (currentUrl === url) {
+    return;
+  }
 
   // URLを更新
   currentUrl = url;
@@ -151,7 +153,9 @@ const mutationCallback = ((mutations: MutationRecord[]) => {
     ? findGitHubUrlChangeTargetElement(addedNodes)
     : findGitLabUrlChangeTargetElement(addedNodes);
 
-  if (!changeTarget) return;
+  if (!changeTarget) {
+    return;
+  }
 
   manageEventListeners({
     url: window.location.href,
